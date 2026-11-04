@@ -20,11 +20,12 @@ else:
 
 # Customize these after examining which stocks and dates are available.
 STOCK_TO_EXPLORE = "HOG"
+STOCKS_TO_COMPARE = ["HOG", "AAPL", "MSFT"]
 START_DATE = "2025-01-01"
 END_DATE = "2025-02-01"
 PREVIEW_ROWS = 15
-SHOW_DATABASE_DETAILS = False
-SHOW_AVAILABLE_SYMBOLS = False
+SHOW_DATABASE_DETAILS = True
+SHOW_AVAILABLE_SYMBOLS = True
 
 # Query 6 variables
 CHOSEN_DATE = "2025-01-03"
@@ -124,11 +125,29 @@ def main():
             GROUP BY symbol
         """, (STOCK_TO_EXPLORE, START_DATE, END_DATE))
         
+        # Compare three stocks using the chosen date range.
+        query(conn, "Comparison of three stocks", """
+            SELECT symbol,
+                COUNT(*) AS bar_count,
+                MIN(low) AS lowest_price,
+                MAX(high) AS highest_price,
+                AVG(close) AS average_close,
+                AVG(volume) AS average_volume
+            FROM bars_5m
+            WHERE symbol IN (?, ?, ?)
+            AND ts_utc >= ?
+            AND ts_utc < ?
+            GROUP BY symbol
+            ORDER BY average_volume DESC
+        """, (*STOCKS_TO_COMPARE, START_DATE, END_DATE))
+        
         # 6. My query 1
         query(conn, f"{STOCK_TO_EXPLORE}: number of five-minute bars available on {CHOSEN_DATE}", """
             SELECT symbol, COUNT(*) as bar_count
             FROM bars_5m
-            WHERE symbol = ? AND ts_utc >= ? AND ts_utc < date(?, '+1 day')
+            WHERE symbol = ?
+                AND ts_utc >= ?
+                AND ts_utc < date(?, '+1 day')
             GROUP BY symbol
         """, (STOCK_TO_EXPLORE, CHOSEN_DATE, CHOSEN_DATE))
         
