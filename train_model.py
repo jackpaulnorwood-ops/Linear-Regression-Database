@@ -36,6 +36,7 @@ def main():
             ORDER BY ts_utc ASC
         """, conn, params=(TRAINING_STOCK,))
 
+    # Convert timestamps to datetime
     df["timestamp"] = pd.to_datetime(
         df["ts_utc"], utc=True, errors="coerce"
     )
@@ -44,7 +45,27 @@ def main():
         subset=["timestamp", "high", "low", "close", "volume"]
     )
 
-    df["session_date"] = df["timestamp"].dt.date
+    # Convert UTC timestamps to New York time
+    df["market_timestamp"] = df["timestamp"].dt.tz_convert(
+        "America/New_York"
+    )
+
+    # Calculate the time of each record in minutes after midnight
+    market_minutes = (
+        df["market_timestamp"].dt.hour * 60
+        + df["market_timestamp"].dt.minute
+    )
+
+    # Keep only regular market hours: 9:30 AM to 4:00 PM
+    df = df[
+        (market_minutes >= 9 * 60 + 30)
+        & (market_minutes < 16 * 60)
+    ].copy()
+
+    # Group records by their actual market date
+    df["session_date"] = df["market_timestamp"].dt.date
+
+    print("Records during regular market hours:", len(df))
 
     print(f"Stock: {TRAINING_STOCK}")
     print(f"Raw historical records: {len(df)}")
@@ -204,22 +225,37 @@ def main():
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))
 
     # Graph 1: Actual vs. predicted returns over time
-    plot_data = test.copy()
+    plot_data = test.copy().reset_index(drop=True)
     plot_data["predicted_return_pct"] = predictions
 
-    # Use the first 500 testing examples so the graph is easier to read
-    plot_data = plot_data.head(500)
+    # Use the first 500 testing examples
+    plot_data = plot_data.head(500).copy()
+
+    # Use sequential positions instead of calendar timestamps
+    x = range(len(plot_data))
+
+    actual = plot_data["target_return_pct"].to_numpy().copy()
+    predicted = plot_data["predicted_return_pct"].to_numpy().copy()
+
+    # Break the lines wherever consecutive records are not 5 minutes apart
+    time_differences = plot_data["timestamp"].diff()
+
+    missing_intervals = time_differences.ne(pd.Timedelta(minutes=5))
+    missing_intervals.iloc[0] = False
+
+    actual[missing_intervals.to_numpy()] = float("nan")
+    predicted[missing_intervals.to_numpy()] = float("nan")
 
     axes[0].plot(
-        plot_data["timestamp"],
-        plot_data["target_return_pct"],
+        x,
+        actual,
         label="Actual Return",
         linewidth=1
     )
 
     axes[0].plot(
-        plot_data["timestamp"],
-        plot_data["predicted_return_pct"],
+        x,
+        predicted,
         label="Predicted Return",
         linewidth=1
     )
@@ -227,7 +263,7 @@ def main():
     axes[0].axhline(y=0, linestyle="--", linewidth=0.8)
 
     axes[0].set_title("AAPL: Actual vs. Predicted Returns")
-    axes[0].set_xlabel("Date")
+    axes[0].set_xlabel("Trading Records (Sequential)")
     axes[0].set_ylabel("15-Minute Return (%)")
     axes[0].legend()
     axes[0].grid(True)
