@@ -9,7 +9,7 @@ from time import perf_counter
 from pathlib import Path
 
 NETWORK_DB_PATH = Path(r"\\192.168.1.95\CS-CLASSROOM\intraday_5m.sqlite")
-LOCAL_DB_PATH = Path("intraday_5m.sqlite")
+LOCAL_DB_PATH = Path("/media/compsci/Expansion/MarketDatabase_20261112T164047Z/intraday_5m.sqlite")
 
 # A local copy avoids network latency. If it is not present, use the NAS copy.
 DB_PATH = LOCAL_DB_PATH if LOCAL_DB_PATH.is_file() else NETWORK_DB_PATH
