@@ -39,6 +39,13 @@ greedy (no random exploration). During training, the terminal prints progress
 approximately every 5% of episodes, including the current episode, exploration
 rate, elapsed time, and estimated time remaining.
 
+To test a small training-only entry incentive across the default five seeds,
+run `python q_learning.py --entry-bonus-bps 1`. This adds 1 basis point
+(0.01%) to training reward only when opening a long position. The held-out
+backtest still measures actual market returns after simulated costs, without
+the bonus. Compare that run with a zero-bonus run; the bonus may encourage
+churn and is not profit. The log records the configured bonus for each trial.
+
 The trainer uses CPU-based tabular Q-learning. Its sequential lookup-table
 updates do not benefit from GPU acceleration, so the GPU is not used.
 

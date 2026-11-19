@@ -19,6 +19,7 @@ from q_learning import (
     run_trial,
     state_key,
     train_agent,
+    training_reward,
 )
 
 
@@ -74,6 +75,17 @@ class QLearningTests(unittest.TestCase):
         self.assertTrue(agent.q_values)
         self.assertTrue(pd.notna(report["agent_return_pct"]))
         self.assertGreaterEqual(report["trades"], 0)
+
+    def test_entry_bonus_only_changes_training_entry_reward(self):
+        entry_without_bonus = training_reward(0, 1, 0.0, 5.0, 0.0, False)
+        entry_with_bonus = training_reward(0, 1, 0.0, 5.0, 2.0, False)
+        hold_with_bonus = training_reward(1, 1, 0.0, 5.0, 2.0, False)
+        exit_with_bonus = training_reward(1, 0, 0.0, 5.0, 2.0, False)
+
+        self.assertAlmostEqual(entry_without_bonus, -0.05)
+        self.assertAlmostEqual(entry_with_bonus, -0.03)
+        self.assertEqual(hold_with_bonus, 0.0)
+        self.assertAlmostEqual(exit_with_bonus, -0.05)
 
     def test_training_reports_progress_at_intervals_and_completion(self):
         prepared = prepare_bars(make_bars())
@@ -160,6 +172,7 @@ class QLearningTests(unittest.TestCase):
             episodes=2,
             epsilon_start=1.0,
             epsilon_end=0.05,
+            entry_bonus_bps=1.0,
             cost_bps=5.0,
             seed=10,
         )
@@ -188,6 +201,7 @@ class QLearningTests(unittest.TestCase):
             self.assertTrue(model_path.is_file())
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["compute_device"], "cpu")
+            self.assertEqual(rows[0]["entry_bonus_bps"], "1.0")
 
     def test_model_round_trip_preserves_q_values(self):
         bins = {feature: [0.0, 1.0, 2.0, 3.0] for feature in FEATURES}

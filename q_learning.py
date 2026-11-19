@@ -36,6 +36,7 @@ TRIAL_LOG_FIELDS = [
     "episodes",
     "epsilon_start",
     "epsilon_end",
+    "entry_bonus_bps",
     "epsilon_guidance",
     "sharpe_definition",
     "trial_analysis",
@@ -248,6 +249,24 @@ def _session_rows(data: pd.DataFrame):
         yield session.reset_index(drop=True)
 
 
+def training_reward(
+    position: int,
+    next_position: int,
+    next_return_pct: float,
+    transaction_cost_bps: float,
+    entry_bonus_bps: float,
+    terminal: bool,
+) -> float:
+    costs_pct = transaction_cost_bps / 100
+    reward = next_position * next_return_pct
+    reward -= abs(next_position - position) * costs_pct
+    if position == 0 and next_position == 1:
+        reward += entry_bonus_bps / 100
+    if terminal and next_position:
+        reward -= costs_pct
+    return float(reward)
+
+
 def append_trial_log(path: Path, trial: dict[str, object]) -> None:
     missing = set(TRIAL_LOG_FIELDS).difference(trial)
     if missing:
@@ -337,7 +356,8 @@ def run_trial(
                 print(
                     f"Episodes: {args.episodes}; seed: {seed}; "
                     f"epsilon: {args.epsilon_start} -> {args.epsilon_end}; "
-                    f"transaction cost: {args.cost_bps} bps"
+                    f"transaction cost: {args.cost_bps} bps; "
+                    f"entry bonus: {args.entry_bonus_bps} bps"
                 )
                 print(
                     f"Training: {training_sessions} sessions, {len(training_data)} bars "
@@ -365,6 +385,7 @@ def run_trial(
                     episodes=args.episodes,
                     epsilon_start=args.epsilon_start,
                     epsilon_end=args.epsilon_end,
+                    entry_bonus_bps=args.entry_bonus_bps,
                     transaction_cost_bps=args.cost_bps,
                     seed=seed,
                     progress_callback=report_progress,
@@ -426,6 +447,7 @@ def run_trial(
                     "episodes": args.episodes,
                     "epsilon_start": args.epsilon_start,
                     "epsilon_end": args.epsilon_end,
+                    "entry_bonus_bps": args.entry_bonus_bps,
                     "epsilon_guidance": epsilon_guidance,
                     "sharpe_definition": sharpe_definition,
                     "trial_analysis": trial_analysis,
@@ -487,15 +509,17 @@ def train_agent(
     discount: float = 0.95,
     epsilon_start: float = 1.0,
     epsilon_end: float = 0.05,
+    entry_bonus_bps: float = 0.0,
     transaction_cost_bps: float = 5.0,
     seed: int = 0,
     progress_callback: Callable[[int, int, float], None] | None = None,
 ) -> QLearningAgent:
     if episodes < 1:
         raise ValueError("episodes must be at least 1")
+    if entry_bonus_bps < 0:
+        raise ValueError("entry_bonus_bps cannot be negative")
     sessions = list(_session_rows(training_data))
     agent = QLearningAgent(bins, learning_rate, discount, seed)
-    costs_pct = transaction_cost_bps / 100
     progress_interval = max(1, math.ceil(episodes / 20))
 
     for episode in range(episodes):
@@ -508,18 +532,21 @@ def train_agent(
                 key = state_key(row, position, bins)
                 action = agent.choose_action(key, epsilon)
                 next_position = action
-                reward = next_position * row["next_return_pct"]
-                reward -= abs(next_position - position) * costs_pct
-
                 terminal = index == len(session) - 1
-                if terminal and next_position:
-                    reward -= costs_pct
+                reward = training_reward(
+                    position,
+                    next_position,
+                    float(row["next_return_pct"]),
+                    transaction_cost_bps,
+                    entry_bonus_bps,
+                    terminal,
+                )
                 if terminal:
                     next_key = ""
                 else:
                     next_row = session.iloc[index + 1]
                     next_key = state_key(next_row, next_position, bins)
-                agent.update(key, action, float(reward), next_key, terminal)
+                agent.update(key, action, reward, next_key, terminal)
                 position = next_position
 
         completed = episode + 1
@@ -686,6 +713,15 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=200)
     parser.add_argument("--epsilon-start", type=float, default=1.0)
     parser.add_argument("--epsilon-end", type=float, default=0.05)
+    parser.add_argument(
+        "--entry-bonus-bps",
+        type=float,
+        default=0.0,
+        help=(
+            "Training-only reward bonus, in basis points, for flat-to-long entries "
+            "(default: 0; backtest returns never include this bonus)"
+        ),
+    )
     parser.add_argument("--cost-bps", type=float, default=5.0)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
@@ -695,6 +731,8 @@ def main() -> None:
         parser.error("--episodes must be at least 1")
     if args.cost_bps < 0:
         parser.error("--cost-bps cannot be negative")
+    if args.entry_bonus_bps < 0:
+        parser.error("--entry-bonus-bps cannot be negative")
     if not 0 <= args.epsilon_start <= 1 or not 0 <= args.epsilon_end <= 1:
         parser.error("--epsilon-start and --epsilon-end must be between 0 and 1")
 
