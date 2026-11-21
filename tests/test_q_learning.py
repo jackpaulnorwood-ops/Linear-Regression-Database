@@ -217,6 +217,21 @@ class QLearningTests(unittest.TestCase):
         self.assertEqual(restored.q_values[key], [0.25, 0.75])
         self.assertEqual(metadata["symbol"], "AAPL")
 
+    def test_saving_model_archives_previous_model(self):
+        bins = {feature: [0.0, 1.0, 2.0, 3.0] for feature in FEATURES}
+        agent = QLearningAgent(bins)
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "q_learning_model.json"
+            agent.save(path, "AAPL", 5.0)
+            agent.q_values["new-state"] = [0.25, 0.75]
+            agent.save(path, "AAPL", 5.0)
+
+            archive_directory = Path(directory) / "q_learning_model_archive"
+            archives = list(archive_directory.glob("q_learning_model_*.json"))
+
+        self.assertEqual(len(archives), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

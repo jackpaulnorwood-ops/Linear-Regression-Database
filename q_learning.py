@@ -7,6 +7,7 @@ import importlib.metadata
 import json
 import math
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -243,6 +244,17 @@ class QLearningAgent:
         return int(np.argmax(self.values(state_key(row, position, self.bins))))
 
     def save(self, path: Path, symbol: str, transaction_cost_bps: float) -> None:
+        if path.exists():
+            archive_directory = path.resolve().parent / "q_learning_model_archive"
+            archive_directory.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            archive_path = archive_directory / f"{path.stem}_{timestamp}.json"
+            suffix = 1
+            while archive_path.exists():
+                archive_path = archive_directory / f"{path.stem}_{timestamp}_{suffix:02d}.json"
+                suffix += 1
+            shutil.copy2(path, archive_path)
+
         document = {
             "version": MODEL_VERSION,
             "symbol": symbol,
