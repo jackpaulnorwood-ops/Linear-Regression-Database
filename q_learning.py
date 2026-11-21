@@ -375,7 +375,7 @@ class Tee:
 
 def create_run_directory(run_root: Path) -> Path:
     run_root.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     candidate = run_root / f"run_{timestamp}"
     suffix = 1
     while candidate.exists():
