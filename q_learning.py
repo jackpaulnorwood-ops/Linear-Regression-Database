@@ -308,14 +308,35 @@ def append_trial_log(path: Path, trial: dict[str, object]) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     needs_header = not path.exists() or path.stat().st_size == 0
+
     if not needs_header:
         with path.open("r", newline="", encoding="utf-8") as log_file:
-            existing_header = next(csv.reader(log_file), [])
+            reader = csv.DictReader(log_file)
+            existing_header = reader.fieldnames or []
+            existing_rows = list(reader)
+
         if existing_header != TRIAL_LOG_FIELDS:
-            raise ValueError(
-                f"Trial log columns in {path} do not match this version. "
-                "Choose a new path with --trial-log."
-            )
+            # Upgrade an older q_learning_trials.csv rather than silently losing
+            # existing rows or raising an avoidable header error.
+            old_fields = set(existing_header)
+            new_fields = set(TRIAL_LOG_FIELDS)
+            unknown_fields = old_fields.difference(new_fields)
+            if unknown_fields:
+                raise ValueError(
+                    f"Trial log columns in {path} contain unknown fields: "
+                    f"{', '.join(sorted(unknown_fields))}."
+                )
+
+            with path.open("w", newline="", encoding="utf-8") as log_file:
+                writer = csv.DictWriter(log_file, fieldnames=TRIAL_LOG_FIELDS)
+                writer.writeheader()
+                for existing_row in existing_rows:
+                    writer.writerow(
+                        {
+                            field: existing_row.get(field, "")
+                            for field in TRIAL_LOG_FIELDS
+                        }
+                    )
 
     with path.open("a", newline="", encoding="utf-8") as log_file:
         writer = csv.DictWriter(log_file, fieldnames=TRIAL_LOG_FIELDS)
@@ -530,9 +551,51 @@ def run_trial(
 
                 append_trial_log(trial_log_path, trial)
                 print(f"Trial summary appended to {trial_log_path}")
+                write_trial_analysis(run_directory, trial_directory, trial)
+                print(f"Trial analysis written to {trial_directory / 'analysis.md'}")
             except Exception as exc:
                 print(f"TRIAL FAILED: {type(exc).__name__}: {exc}", flush=True)
                 raise
+
+
+def write_trial_analysis(run_directory: Path, trial_directory: Path, trial: dict[str, object]) -> None:
+    """Write searchable human-readable analysis files for one completed trial."""
+    trial_number = int(trial["trial_number"])
+    analysis = str(trial["trial_analysis"])
+    analysis_path = trial_directory / "analysis.md"
+
+    analysis_path.write_text(
+        "# Trial analysis\n\n"
+        f"- **Trial:** {trial_number}\n"
+        f"- **Run:** {run_directory}\n"
+        f"- **Started:** {trial['run_started_at_utc']}\n"
+        f"- **Symbol:** {trial['symbol']}\n"
+        f"- **Seed:** {trial['seed']}\n"
+        f"- **Episodes:** {trial['episodes']}\n"
+        f"- **Test period:** {trial['test_start']} to {trial['test_end']}\n"
+        f"- **Net return:** {float(trial['agent_return_pct']):.3f}%\n"
+        f"- **Buy-and-hold:** {float(trial['buy_hold_return_pct']):.3f}%\n"
+        f"- **Random baseline:** {float(trial['random_return_pct']):.3f}%\n"
+        f"- **Sharpe:** {float(trial['sharpe_ratio']):.3f}\n"
+        f"- **Trades:** {trial['trades']}\n\n"
+        "## Analysis\n\n"
+        f"{analysis}\n\n"
+        "## Interpretation notes\n\n"
+        f"- **Epsilon:** {trial['epsilon_guidance']}\n"
+        f"- **Sharpe:** {trial['sharpe_definition']}\n",
+        encoding="utf-8",
+    )
+
+    run_index = run_directory / "analyses.md"
+    with run_index.open("a", encoding="utf-8") as index_file:
+        index_file.write(
+            f"## Trial {trial_number}: {trial['symbol']} (seed {trial['seed']})\n\n"
+            f"- **Net return:** {float(trial['agent_return_pct']):.3f}%\n"
+            f"- **Sharpe:** {float(trial['sharpe_ratio']):.3f}\n"
+            f"- **Trades:** {trial['trades']}\n"
+            f"- **Details:** [`{analysis_path.name}`](trial_{trial_number:04d}/analysis.md)\n\n"
+            f"{analysis}\n\n"
+        )
 
 
 def train_agent(
@@ -771,7 +834,15 @@ def main() -> None:
         parser.error("--epsilon-start and --epsilon-end must be between 0 and 1")
 
     run_directory = create_run_directory(args.run_root)
-    trial_log_path = args.trial_log or run_directory / "trials.csv"
+    (run_directory / "analyses.md").write_text(
+        f"# Training analyses\n\n"
+        f"- **Symbol:** {args.symbol}\n"
+        f"- **Trials:** {args.trials}\n"
+        f"- **Episodes per trial:** {args.episodes}\n"
+        f"- **Seed:** {args.seed}\n\n",
+        encoding="utf-8",
+    )
+    trial_log_path = args.trial_log or Path(__file__).resolve().parent / "q_learning_trials.csv"
     with (run_directory / "run.log").open("w", encoding="utf-8", buffering=1) as run_log:
         with redirect_stdout(Tee(sys.stdout, run_log)):
             print(f"Run directory: {run_directory}")

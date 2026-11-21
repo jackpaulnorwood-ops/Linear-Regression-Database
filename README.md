@@ -71,3 +71,26 @@ also pass `--manage-existing-position` after confirming that the bot should
 manage that symbol's position. Review the model, account, and order details
 before submitting; the script evaluates a single decision per run and does
 not run continuously.
+
+## Reviewing training analyses
+
+Every completed trial now saves an organized Markdown analysis in
+`trial_####/analysis.md`, while the run directory also contains `analyses.md`
+with a linked summary of every trial. The project-level `q_learning_trials.csv`
+stores the same analysis plus sortable metrics for spreadsheet and terminal use.
+
+View the latest result:
+
+```bash
+python view_trials.py --latest
+```
+
+View or search one specific result:
+
+```bash
+python view_trials.py --trial 1
+python view_trials.py --search "random flat/long"
+```
+
+Running `python view_trials.py` prints all analyses followed by a ranking of the
+highest-net-return trials.
