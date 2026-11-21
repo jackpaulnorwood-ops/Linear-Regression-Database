@@ -4,19 +4,46 @@ Connect to the classroom NAS in PowerShell before running this script.
 Choose your own tickers, date range, and trading horizon after exploring.
 """
 
+import os
 import sqlite3
 from time import perf_counter
 from pathlib import Path
 
 NETWORK_DB_PATH = Path(r"\\192.168.1.95\CS-CLASSROOM\intraday_5m.sqlite")
-LOCAL_DB_PATH = Path("/home/compsci/Desktop/llama/llama_alpaca/intraday_5m.sqlite")
 
-# A local copy avoids network latency. If it is not present, use the NAS copy.
-DB_PATH = LOCAL_DB_PATH if LOCAL_DB_PATH.is_file() else NETWORK_DB_PATH
+# The STOCK_DB_PATH environment variable allows every computer to use a
+# different local database location without changing this source file.
+def find_database() -> Path:
+    override = os.environ.get("STOCK_DB_PATH")
+    candidates = []
+
+    if override:
+        candidates.append(Path(override).expanduser())
+
+    candidates.extend([
+        Path(__file__).resolve().parent / "intraday_5m.sqlite",
+        Path.home() / "Desktop" / "llama" / "llama_alpaca" / "intraday_5m.sqlite",
+        Path.home() / "Documents" / "StockData" / "intraday_5m.sqlite",
+    ])
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+
+    return NETWORK_DB_PATH
+
+
+DB_PATH = find_database()
+if not DB_PATH.is_file():
+    raise FileNotFoundError(
+        "Cannot find intraday_5m.sqlite. Set STOCK_DB_PATH to the full database "
+        "path, place it beside explore_stocks.py, or connect to the classroom NAS."
+    )
+
 if DB_PATH == NETWORK_DB_PATH:
     DB_URI = "file:////192.168.1.95/CS-CLASSROOM/intraday_5m.sqlite?mode=ro&immutable=1"
 else:
-    DB_URI = f"{DB_PATH.resolve().as_uri()}?mode=ro&immutable=1"
+    DB_URI = f"{DB_PATH.as_uri()}?mode=ro&immutable=1"
 
 # Customize these after examining which stocks and dates are available.
 STOCK_TO_EXPLORE = "HOG"
