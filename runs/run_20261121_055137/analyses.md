@@ -32,3 +32,24 @@ The learned policy beat the seeded random flat/long baseline. The policy complet
 
 The learned policy beat the seeded random flat/long baseline. The policy completed 3 round-trip trades with 0.0% market exposure. Learned net return -0.630% versus random -99.606% and buy-and-hold -42.151%. This is one seed on one held-out period, not conclusive evidence of future performance.
 
+## Trial 4: AAPL+RBLX (seed 3)
+
+- **Net return:** -1.539%
+- **Sharpe:** -1.316
+- **Trades:** 8
+- **Details:** [`analysis.md`](trial_0004/analysis.md)
+
+The learned policy beat the seeded random flat/long baseline. The policy completed 8 round-trip trades with 0.1% market exposure. Learned net return -1.539% versus random -99.665% and buy-and-hold -42.151%. This is one seed on one held-out period, not conclusive evidence of future performance.
+
+## Trial 5: AAPL+RBLX (seed 4)
+
+- **Net return:** -2.705%
+- **Sharpe:** -1.815
+- **Trades:** 32
+- **Details:** [`analysis.md`](trial_0005/analysis.md)
+
+The learned policy beat the seeded random flat/long baseline. The policy completed 32 round-trip trades with 0.2% market exposure. Learned net return -2.705% versus random -99.570% and buy-and-hold -42.151%. This is one seed on one held-out period, not conclusive evidence of future performance.
+
+## Run comparison
+
+- [`trial_comparison.png`](./trial_comparison.png)
