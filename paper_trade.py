@@ -68,6 +68,12 @@ def main() -> None:
 
     agent, model = QLearningAgent.load(args.model)
     symbol = model["symbol"].upper()
+    if "+" in symbol:
+        raise RuntimeError(
+            "Pooled multi-symbol models cannot be mapped safely to one Alpaca position; "
+            "use a single-symbol model."
+        )
+
     key = os.environ.get("APCA_API_KEY_ID")
     secret = os.environ.get("APCA_API_SECRET_KEY")
     if not key or not secret:

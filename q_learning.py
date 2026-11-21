@@ -267,6 +267,8 @@ class QLearningAgent:
             "transaction_cost_bps": transaction_cost_bps,
             "learning_rate": self.learning_rate,
             "discount": self.discount,
+            "paper_ready": False,
+            "paper_ready_reason": "Awaiting repeated held-out validation and explicit approval",
         }
         path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 

@@ -234,7 +234,9 @@ APCA_API_KEY_ID=your_paper_key
 APCA_API_SECRET_KEY=your_paper_secret
 ```
 
-The `.env` file is Git-ignored. Use `--submit-paper-order` only after reviewing the model, account, market data, and proposed order. Paper-trading success is not live-trading proof.
+The `.env` file is Git-ignored. Use `--submit-paper-order` only after reviewing the model, account, market data, and proposed order. Every newly trained model has `paper_ready: false` until it is explicitly validated and approved. Paper submission also requires `PAPER_TRADING_ENABLED=true`; the value must be set outside the model file. Pooled models are rejected for paper submission because their output cannot be mapped safely to one account position.
+
+The `.github/workflows/paper-trader.yml` workflow runs a dry-run by schedule and can submit paper orders only through manual dispatch after repository secrets and `PAPER_TRADING_ENABLED=true` are configured. Paper-trading success is not live-trading proof.
 
 ## Tests and migration
 
@@ -261,3 +263,7 @@ python .\migrate_runs.py
 ## Interpretation and safety
 
 This program is a historical simulation. Net return, Sharpe, drawdown, and trade counts describe one chronological held-out period and do not establish future profitability. The random baseline and buy-and-hold comparisons are references, not guarantees of skill. Transaction costs, market gaps, position timing, and data quality can materially change results.
+
+## Improvement log
+
+All controlled experiments, code improvements, validation outcomes, and deployment decisions are recorded in `IMPROVEMENT_LOG.md`. Historical backtests remain non-deployment evidence until repeated out-of-sample performance is demonstrated.

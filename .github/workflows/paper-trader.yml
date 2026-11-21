@@ -1,0 +1,48 @@
+name: Q-learning paper trader
+
+on:
+  schedule:
+    - cron: "0 */2 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      submit_order:
+        description: "Submit a paper order (requires paper-ready model and repository variable)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+jobs:
+  decision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Verify model exists
+        run: test -f q_learning_model.json
+
+      - name: Dry-run or paper-trade decision
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+          PAPER_TRADING_ENABLED: ${{ vars.PAPER_TRADING_ENABLED || 'false' }}
+        run: |
+          submit_flag=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.submit_order }}" = "true" ]; then
+            submit_flag="--submit-paper-order --manage-existing-position"
+          fi
+          python paper_trade.py --model q_learning_model.json --notional 100 $submit_flag

@@ -272,6 +272,17 @@ class QLearningTests(unittest.TestCase):
             self.assertTrue(visual_paths)
             self.assertTrue(all(path.is_file() for path in visual_paths))
 
+    def test_new_models_are_not_paper_ready_by_default(self):
+        bins = {feature: [0.0, 1.0, 2.0, 3.0] for feature in FEATURES}
+        agent = QLearningAgent(bins)
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "model.json"
+            agent.save(path, "AAPL", 5.0)
+            _, metadata = QLearningAgent.load(path)
+
+        self.assertFalse(metadata["paper_ready"])
+
 
 if __name__ == "__main__":
     unittest.main()
