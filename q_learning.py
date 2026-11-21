@@ -49,6 +49,9 @@ ensure_requirements(Path(__file__).resolve().parent / "requirements.txt")
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from explore_stocks import DB_PATH, DB_URI
 
@@ -581,6 +584,8 @@ def run_trial(
                 print(f"Trial summary appended to {trial_log_path}")
                 write_trial_analysis(run_directory, trial_directory, trial)
                 print(f"Trial analysis written to {trial_directory / 'analysis.md'}")
+                create_trial_visualizations(trial_directory, report, random_report, trial)
+                print(f"Trial visualizations written to {trial_directory / 'visualizations'}")
                 return trial
             except Exception as exc:
                 print(f"TRIAL FAILED: {type(exc).__name__}: {exc}", flush=True)
@@ -625,6 +630,218 @@ def write_trial_analysis(run_directory: Path, trial_directory: Path, trial: dict
             f"- **Details:** [`{analysis_path.name}`](trial_{trial_number:04d}/analysis.md)\n\n"
             f"{analysis}\n\n"
         )
+
+
+def create_trial_visualizations(
+    trial_directory: Path,
+    report: dict[str, object] | None = None,
+    random_report: dict[str, object] | None = None,
+    trial: dict[str, object] | None = None,
+) -> list[Path]:
+    """Save held-out performance charts for one completed trial."""
+    if isinstance(trial_directory, QLearningAgent) and isinstance(report, Path):
+        legacy_agent = trial_directory
+        legacy_run_directory = report
+
+        csv_path = legacy_run_directory / "q_table_summary.csv"
+        with csv_path.open("w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(["state", "flat_q", "long_q", "preferred_action"])
+            for state, values in list(legacy_agent.q_values.items())[:500]:
+                writer.writerow([state, values[0], values[1], int(values[1] > values[0])])
+
+        html_path = legacy_run_directory / "q_table_visualization.html"
+        rows = "".join(
+            f"<tr><td>{state}</td><td>{values[0]:.6f}</td><td>{values[1]:.6f}</td></tr>"
+            for state, values in list(legacy_agent.q_values.items())[:500]
+        )
+        html_path.write_text(
+            "<!doctype html><html><body><h1>Q-table visualization</h1>"
+            "<table><thead><tr><th>State</th><th>Flat Q</th><th>Long Q</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table></body></html>",
+            encoding="utf-8",
+        )
+        return [csv_path, html_path]
+
+    visual_directory = trial_directory / "visualizations"
+    visual_directory.mkdir(parents=True, exist_ok=True)
+    created: list[Path] = []
+
+    agent_bars = report["bar_records"]
+    random_bars = random_report["bar_records"]
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10), constrained_layout=True)
+
+    if agent_bars:
+        timestamps = [pd.Timestamp(record["timestamp"]) for record in agent_bars]
+        agent_equity = [float(record["agent_equity"]) for record in agent_bars]
+        buy_hold_equity = [float(record["buy_hold_equity"]) for record in agent_bars]
+        axes[0, 0].plot(timestamps, agent_equity, label="Learned model", linewidth=2)
+        axes[0, 0].plot(timestamps, buy_hold_equity, label="Buy-and-hold", linewidth=2, alpha=0.8)
+    if random_bars:
+        timestamps = [pd.Timestamp(record["timestamp"]) for record in random_bars]
+        random_equity = [float(record["agent_equity"]) for record in random_bars]
+        axes[0, 0].plot(timestamps, random_equity, label="Random baseline", linewidth=1.5, alpha=0.7)
+    axes[0, 0].set_title("Cumulative equity comparison")
+    axes[0, 0].set_xlabel("Held-out date")
+    axes[0, 0].set_ylabel("Equity (starting value = 1.0)")
+    axes[0, 0].legend()
+    axes[0, 0].grid(alpha=0.25)
+
+    drawdowns = report["drawdown_records"]
+    if drawdowns:
+        timestamps = [pd.Timestamp(record["timestamp"]) for record in drawdowns]
+        values = [float(record["drawdown_pct"]) for record in drawdowns]
+        axes[0, 1].fill_between(timestamps, values, 0, color="#d62728", alpha=0.35)
+        axes[0, 1].plot(timestamps, values, color="#d62728", linewidth=1)
+    axes[0, 1].set_title("Model drawdown")
+    axes[0, 1].set_xlabel("Held-out date")
+    axes[0, 1].set_ylabel("Drawdown (%)")
+    axes[0, 1].grid(alpha=0.25)
+
+    daily_returns = [float(record["daily_return_pct"]) for record in report["daily_records"]]
+    if daily_returns:
+        axes[1, 0].hist(daily_returns, bins=min(30, max(5, len(daily_returns) // 5)), alpha=0.75, color="#1f77b4")
+    axes[1, 0].axvline(0, color="black", linestyle="--", linewidth=1)
+    axes[1, 0].set_title("Daily strategy returns")
+    axes[1, 0].set_xlabel("Daily net return (%)")
+    axes[1, 0].set_ylabel("Session count")
+    axes[1, 0].grid(alpha=0.25)
+
+    trade_returns = [float(record["trade_return_pct"]) for record in report["trade_records"]]
+    if trade_returns:
+        axes[1, 1].hist(trade_returns, bins=min(30, max(5, len(trade_returns) // 5)), alpha=0.75, color="#2ca02c")
+    else:
+        axes[1, 1].text(0.5, 0.5, "No completed trades", ha="center", va="center", transform=axes[1, 1].transAxes)
+    axes[1, 1].axvline(0, color="black", linestyle="--", linewidth=1)
+    axes[1, 1].set_title("Completed trade outcomes")
+    axes[1, 1].set_xlabel("Trade net return (%)")
+    axes[1, 1].set_ylabel("Trade count")
+    axes[1, 1].grid(alpha=0.25)
+
+    fig.suptitle(
+        f"Held-out backtest - {trial['symbol']} | Trial {trial['trial_number']} | "
+        f"Net {float(trial['agent_return_pct']):.2f}% | Sharpe {float(trial['sharpe_ratio']):.3f}",
+        fontsize=14,
+    )
+    dashboard_path = visual_directory / "performance_dashboard.png"
+    fig.savefig(dashboard_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    created.append(dashboard_path)
+
+    fig, axes = plt.subplots(2, 1, figsize=(16, 9), sharex=True, constrained_layout=True)
+    if agent_bars:
+        timestamps = [pd.Timestamp(record["timestamp"]) for record in agent_bars]
+        actions = [int(record["action"]) for record in agent_bars]
+        axes[0].step(timestamps, actions, where="post", color="#1f77b4", linewidth=1.5)
+    axes[0].set_yticks([0, 1], ["Flat", "Long"])
+    axes[0].set_title("Position and market exposure")
+    axes[0].set_ylabel("Position")
+    axes[0].grid(alpha=0.25)
+
+    daily_records = report["daily_records"]
+    if daily_records:
+        dates = [pd.Timestamp(record["timestamp"]) for record in daily_records]
+        entries = [int(record["session_entries"]) for record in daily_records]
+        axes[1].bar(dates, entries, color="#9467bd", alpha=0.8)
+    axes[1].set_title("Entries per trading session")
+    axes[1].set_xlabel("Session date")
+    axes[1].set_ylabel("Entries")
+    axes[1].grid(alpha=0.25)
+    exposure_path = visual_directory / "position_and_exposure.png"
+    fig.savefig(exposure_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    created.append(exposure_path)
+
+    symbols = sorted({str(record["symbol"]) for record in agent_bars if str(record["symbol"]) != "ALL"})
+    if len(symbols) > 1:
+        fig, axes = plt.subplots(1, 1, figsize=(16, 7), constrained_layout=True)
+        for symbol in symbols:
+            records = sorted(
+                [record for record in agent_bars if str(record["symbol"]) == symbol],
+                key=lambda record: pd.Timestamp(record["timestamp"]),
+            )
+            timestamps = [pd.Timestamp(record["timestamp"]) for record in records]
+            equity = 1.0
+            values = []
+            for record in records:
+                equity *= max(0.0, 1 + float(record["reward_pct"] if record["action"] else 0) / 100)
+                values.append(equity)
+            axes.plot(timestamps, values, linewidth=1.8, label=symbol)
+        axes.set_title("Pooled-model strategy equity by symbol")
+        axes.set_xlabel("Held-out date")
+        axes.set_ylabel("Symbol-relative model equity")
+        axes.legend()
+        axes.grid(alpha=0.25)
+        symbol_path = visual_directory / "symbol_comparison.png"
+        fig.savefig(symbol_path, dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        created.append(symbol_path)
+
+    return created
+
+
+def create_run_visualizations(run_directory: Path, trials: list[dict[str, object]]) -> Path:
+    """Save a run-level comparison chart across completed trials."""
+    visual_path = run_directory / "trial_comparison.png"
+    if not trials:
+        return visual_path
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10), constrained_layout=True)
+    numbers = [int(trial["trial_number"]) for trial in trials]
+    returns = [float(trial["agent_return_pct"]) for trial in trials]
+    sharpes = [float(trial["sharpe_ratio"]) for trial in trials]
+    trades = [int(trial["trades"]) for trial in trials]
+    drawdowns = [float(trial["max_drawdown_pct"]) for trial in trials]
+
+    if len(numbers) == 1:
+        fig.suptitle("Run comparison — 1 trial (run another trial to compare trends)", fontsize=14)
+
+    axes[0, 0].bar(numbers, returns, width=0.55, color=["#2ca02c" if value >= 0 else "#d62728" for value in returns])
+    axes[0, 0].axhline(0, color="black", linewidth=1)
+    axes[0, 0].set_title("Net return by trial")
+    axes[0, 0].set_xlabel("Trial")
+    axes[0, 0].set_ylabel("Net return (%)")
+    axes[0, 0].grid(alpha=0.25)
+    axes[0, 0].set_xticks(numbers)
+    for number, value in zip(numbers, returns):
+        axes[0, 0].annotate(f"{value:.2f}%", (number, value), textcoords="offset points", xytext=(0, 6), ha="center")
+
+    axes[0, 1].plot(numbers, sharpes, marker="o", color="#1f77b4", markersize=8)
+    axes[0, 1].axhline(0, color="black", linewidth=1)
+    axes[0, 1].set_title("Annualized Sharpe by trial")
+    axes[0, 1].set_xlabel("Trial")
+    axes[0, 1].set_ylabel("Sharpe")
+    axes[0, 1].grid(alpha=0.25)
+    axes[0, 1].set_xticks(numbers)
+    for number, value in zip(numbers, sharpes):
+        axes[0, 1].annotate(f"{value:.3f}", (number, value), textcoords="offset points", xytext=(0, 7), ha="center")
+
+    axes[1, 0].bar(numbers, trades, width=0.55, color="#9467bd")
+    axes[1, 0].set_title("Completed trades by trial")
+    axes[1, 0].set_xlabel("Trial")
+    axes[1, 0].set_ylabel("Trades")
+    axes[1, 0].grid(alpha=0.25)
+    axes[1, 0].set_xticks(numbers)
+    for number, value in zip(numbers, trades):
+        axes[1, 0].annotate(str(value), (number, value), textcoords="offset points", xytext=(0, 6), ha="center")
+
+    axes[1, 1].bar(numbers, drawdowns, width=0.55, color="#ff7f0e")
+    axes[1, 1].set_title("Maximum drawdown by trial")
+    axes[1, 1].set_xlabel("Trial")
+    axes[1, 1].set_ylabel("Drawdown (%)")
+    axes[1, 1].grid(alpha=0.25)
+    axes[1, 1].set_xticks(numbers)
+    for number, value in zip(numbers, drawdowns):
+        axes[1, 1].annotate(f"{value:.2f}%", (number, value), textcoords="offset points", xytext=(0, 6), ha="center")
+
+    if len(numbers) == 1:
+        for axis in axes.flat:
+            axis.set_xlim(0.5, 1.5)
+
+    fig.savefig(visual_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    return visual_path
 
 
 def train_agent(
@@ -700,13 +917,23 @@ def backtest(
     daily_returns = []
     invested_bars = 0
 
+    bar_records = []
+    daily_records = []
+    trade_records = []
+    drawdown_records = []
+    buy_hold_equity = 1.0
+
+    open_trade = None
     for session in _session_rows(test_data):
         position = 0
         trade_equity = None
         session_entries = 0
+        session_exits = 0
         session_equity_before = equity
         for index, row in session.iterrows():
             action = agent.predict(row, position)
+            timestamp = row.get("timestamp")
+            symbol = str(row.get("symbol", "ALL"))
             reward = action * row["next_return_pct"]
             if action != position:
                 reward -= costs_pct
@@ -714,14 +941,22 @@ def backtest(
                     entries += 1
                     session_entries += 1
                     trade_equity = 1.0
+                    open_trade = {
+                        "symbol": symbol,
+                        "entry_timestamp": timestamp,
+                        "entry_equity": equity,
+                    }
                 else:
                     exits += 1
+                    session_exits += 1
             if index == len(session) - 1 and action:
                 reward -= costs_pct
                 exits += 1
+                session_exits += 1
             reward = float(reward)
             multiplier = max(0.0, 1 + reward / 100)
             equity *= multiplier
+            buy_hold_equity *= max(0.0, 1 + float(row["next_return_pct"]) / 100)
             returns.append(reward)
             if action:
                 invested_bars += 1
@@ -733,24 +968,58 @@ def backtest(
             ):
                 if trade_equity is None:
                     raise RuntimeError("Backtest closed a position without an open trade.")
-                trade_returns.append((trade_equity - 1) * 100)
+                trade_return_pct = (trade_equity - 1) * 100
+                trade_returns.append(trade_return_pct)
+                if open_trade:
+                    trade_records.append({
+                        **open_trade,
+                        "exit_timestamp": timestamp,
+                        "exit_equity": equity,
+                        "trade_return_pct": trade_return_pct,
+                    })
+                    open_trade = None
                 trade_equity = None
+
+            bar_records.append({
+                "timestamp": timestamp,
+                "symbol": symbol,
+                "action": action,
+                "reward_pct": reward,
+                "market_return_pct": float(row["next_return_pct"]),
+                "agent_equity": equity,
+                "buy_hold_equity": buy_hold_equity,
+            })
             position = action
 
         daily_trade_counts.append(session_entries)
-        daily_returns.append((equity / session_equity_before - 1) * 100)
+        daily_return_pct = (equity / session_equity_before - 1) * 100
+        daily_returns.append(daily_return_pct)
         daily_gross = np.prod(1 + session["next_return_pct"].to_numpy() / 100)
         entry_and_exit = max(0.0, 1 - costs_pct / 100) ** 2
         buy_hold *= max(0.0, float(daily_gross) * entry_and_exit)
 
+        session_date = session.iloc[0].get("session_date")
+        daily_records.append({
+            "timestamp": session_date,
+            "agent_equity": equity,
+            "buy_hold_equity": buy_hold,
+            "daily_return_pct": daily_return_pct,
+            "session_entries": session_entries,
+            "session_exits": session_exits,
+        })
+
     peak = 1.0
     max_drawdown = 0.0
-    running_equity = 1.0
-    for value in returns:
-        running_equity *= max(0.0, 1 + value / 100)
+    drawdown_records = []
+    for bar in bar_records:
+        running_equity = float(bar["agent_equity"])
         peak = max(peak, running_equity)
-        if peak:
-            max_drawdown = max(max_drawdown, (peak - running_equity) / peak)
+        drawdown_pct = (peak - running_equity) / peak * 100 if peak else 0.0
+        max_drawdown = max(max_drawdown, drawdown_pct / 100)
+        drawdown_records.append({
+            "timestamp": bar["timestamp"],
+            "drawdown_pct": drawdown_pct,
+        })
 
     winning_trades = [value for value in trade_returns if value > 1e-12]
     losing_trades = [value for value in trade_returns if value < -1e-12]
@@ -806,6 +1075,10 @@ def backtest(
         ),
         "daily_trade_counts": daily_trade_counts,
         "bars": len(test_data),
+        "bar_records": bar_records,
+        "daily_records": daily_records,
+        "trade_records": trade_records,
+        "drawdown_records": drawdown_records,
     }
 
 
@@ -1000,6 +1273,13 @@ def main() -> None:
                 )
                 trial_summaries.append(trial_result)
             generate_tuning_recommendations(run_directory, trial_summaries, args)
+            run_chart = create_run_visualizations(run_directory, trial_summaries)
+            with (run_directory / "analyses.md").open("a", encoding="utf-8") as index_file:
+                index_file.write(
+                    "## Run comparison\n\n"
+                    f"- [`{run_chart.name}`](./{run_chart.name})\n"
+                )
+            print(f"Run comparison visual written to {run_chart}")
             print(f"All {args.trials} trials completed.")
 
 

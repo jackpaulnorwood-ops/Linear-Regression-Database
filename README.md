@@ -126,3 +126,16 @@ python view_trials.py --symbol AAPL
 ```
 
 `tuning_advice.md` and `tuning_recommendations.csv` contain rule-based hypotheses. They are suggestions for further validation, not guaranteed parameter improvements.
+
+## Trial visualizations
+
+Each completed trial saves PNG charts inside:
+
+```text
+runs/run_YYYYMMDD_HHMMSS/trial_####/visualizations/
+```
+
+The visualizations include cumulative equity versus buy-and-hold and random baselines,
+model drawdown, daily return distributions, completed trade outcomes, position/exposure
+over time, and per-symbol comparisons for pooled models. The run folder also contains
+`trial_comparison.png`, comparing net return, Sharpe, trades, and drawdown across trials.

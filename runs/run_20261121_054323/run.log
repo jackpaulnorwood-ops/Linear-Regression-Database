@@ -1,0 +1,37 @@
+Run directory: C:\Users\Jack Attack\Repos\Linear-Regression-Database\runs\run_20261121_054323
+Trials: 1; episodes per trial: 1
+Compute device: CPU (tabular Q-learning; GPU is not used)
+Symbol: AAPL; base seed: 0
+Trial CSV: C:\Users\Jack Attack\Repos\Linear-Regression-Database\q_learning_trials.csv
+Loading bars from C:\Users\Jack Attack\Documents\intraday_5m.sqlite ...
+Data ready: 91611 bars across 1445 sessions; train=73029 bars, test=18582 bars.
+Trial 1/1 started: 2026-11-21T05:43:26.690188+00:00
+Symbol: AAPL; compute device: CPU
+Tabular Q-learning uses sequential table updates; GPU execution is not used.
+Episodes: 1; seed: 0; epsilon: 1.0 -> 0.05; transaction cost: 5.0 bps; entry bonus: 0.0 bps
+Training: 1156 sessions, 73029 bars (2016-01-04 to 2025-07-02)
+Test: 289 sessions, 18582 bars (2025-07-03 to 2026-11-19)
+Training progress: episode 1/1 (100%), epsilon=1.000, elapsed=0.2 min, ETA=0.0 min
+
+=== Held-out backtest ===
+Net result: LOSS (-35.82%)
+Buy-and-hold return: -31.41%
+Random flat/long return: -99.11%
+Annualized Sharpe: -4.975
+Random baseline Sharpe: -35.828
+Maximum drawdown: 37.04%
+Completed trades: 491
+Entries: 491; exits: 491
+Win rate: 48.1%
+Average trades/session: 1.70
+Time in market: 31.0%
+Analysis: The learned policy beat the seeded random flat/long baseline. The policy completed 491 round-trip trades with 31.0% market exposure. Learned net return -35.823% versus random -99.107% and buy-and-hold -31.406%. This is one seed on one held-out period, not conclusive evidence of future performance.
+Epsilon: No universal optimum: epsilon is the training-time random-action chance, not decision quality. This run linearly decays the configured start to end; compare schedules across multiple seeds using validation data. Backtest prediction is greedy (epsilon=0).
+Sharpe: Annualized mean daily net return divided by daily return standard deviation (252 sessions/year, 0% risk-free rate); not prediction accuracy and not itself a comparison against random.
+Saved model: C:\Users\Jack Attack\Repos\Linear-Regression-Database\runs\run_20261121_054323\trial_0001\q_learning_model.json
+Past simulated performance does not establish future profitability.
+Trial summary appended to C:\Users\Jack Attack\Repos\Linear-Regression-Database\q_learning_trials.csv
+Trial analysis written to C:\Users\Jack Attack\Repos\Linear-Regression-Database\runs\run_20261121_054323\trial_0001\analysis.md
+Trial visualizations written to C:\Users\Jack Attack\Repos\Linear-Regression-Database\runs\run_20261121_054323\trial_0001\visualizations
+Run comparison visual written to C:\Users\Jack Attack\Repos\Linear-Regression-Database\runs\run_20261121_054323\trial_comparison.png
+All 1 trials completed.

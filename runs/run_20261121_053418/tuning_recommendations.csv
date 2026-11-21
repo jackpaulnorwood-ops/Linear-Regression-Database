@@ -1,0 +1,3 @@
+parameter,current_value,suggested_value,direction,reason,confidence
+cost_bps,5.0,10.0,increase,"Average trial trade count was high; a larger cost can discourage churn, but it should be compared on validation data.",low
+epsilon_end,0.05,0.030000000000000002,decrease,"The best trial was not profitable; reducing final exploration can stabilize greedy behavior, but this remains an empirical result.",low

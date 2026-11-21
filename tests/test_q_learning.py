@@ -14,6 +14,7 @@ from q_learning import (
     append_trial_log,
     backtest,
     create_run_directory,
+    create_trial_visualizations,
     fit_feature_bins,
     prepare_bars,
     run_trial,
@@ -231,6 +232,45 @@ class QLearningTests(unittest.TestCase):
             archives = list(archive_directory.glob("q_learning_model_*.json"))
 
         self.assertEqual(len(archives), 1)
+
+    def test_create_trial_visualizations_exports_charts_and_tables(self):
+        bins = fit_feature_bins(prepare_bars(make_bars()))
+        agent = train_agent(prepare_bars(make_bars()), bins, episodes=4, seed=7)
+
+        with TemporaryDirectory() as directory:
+            run_directory = create_run_directory(Path(directory))
+            create_trial_visualizations(agent, run_directory, bins)
+
+            for file in run_directory.glob("*.html"):
+                self.assertTrue(file.is_file())
+            for file in run_directory.glob("*.csv"):
+                self.assertTrue(file.is_file())
+
+    def test_visualizations_are_saved_with_detailed_backtest_records(self):
+        prepared = prepare_bars(make_bars())
+        bins = fit_feature_bins(prepared)
+        agent = train_agent(prepared, bins, episodes=4, seed=7)
+        report = backtest(agent, prepared)
+        random_report = backtest(RandomPolicy(17), prepared)
+
+        self.assertIn("bar_records", report)
+        self.assertIn("daily_records", report)
+        self.assertIn("trade_records", report)
+        self.assertIn("drawdown_records", report)
+
+        trial = {
+            "trial_number": 1,
+            "symbol": "AAPL",
+            "agent_return_pct": report["agent_return_pct"],
+            "sharpe_ratio": report["sharpe_ratio"],
+        }
+        with TemporaryDirectory() as directory:
+            visual_paths = create_trial_visualizations(
+                Path(directory), report, random_report, trial
+            )
+
+            self.assertTrue(visual_paths)
+            self.assertTrue(all(path.is_file() for path in visual_paths))
 
 
 if __name__ == "__main__":
