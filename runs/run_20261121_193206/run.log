@@ -1,0 +1,6 @@
+Run directory: C:\Users\Jack Attack\Repos\Linear-Regression-Database\runs\run_20261121_193206
+Trials: 5; episodes per trial: 200
+Compute device: CPU (tabular Q-learning; GPU is not used)
+Symbol: AAPL; base seed: 0
+Trial CSV: C:\Users\Jack Attack\Repos\Linear-Regression-Database\q_learning_trials.csv
+Loading bars from C:\Users\Jack Attack\Documents\intraday_5m.sqlite ...

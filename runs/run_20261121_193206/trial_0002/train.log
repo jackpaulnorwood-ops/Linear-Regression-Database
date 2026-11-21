@@ -1,0 +1,6 @@
+Trial 2/5 started: 2026-11-21T20:03:51.711399+00:00
+Symbol: AAPL; compute device: CPU
+Tabular Q-learning uses sequential table updates; GPU execution is not used.
+Episodes: 200; seed: 1; epsilon: 1.0 -> 0.05; transaction cost: 5.0 bps; entry bonus: 1.0 bps
+Training: 1156 sessions, 73029 bars (2016-01-04 to 2025-07-02)
+Test: 289 sessions, 18582 bars (2025-07-03 to 2026-11-19)
