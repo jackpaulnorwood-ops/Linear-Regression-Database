@@ -1001,3 +1001,7 @@ def main() -> None:
                 trial_summaries.append(trial_result)
             generate_tuning_recommendations(run_directory, trial_summaries, args)
             print(f"All {args.trials} trials completed.")
+
+
+if __name__ == "__main__":
+    main()

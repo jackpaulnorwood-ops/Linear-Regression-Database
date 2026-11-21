@@ -23,6 +23,7 @@ def find_database() -> Path:
     candidates.extend([
         Path(__file__).resolve().parent / "intraday_5m.sqlite",
         Path.home() / "Desktop" / "llama" / "llama_alpaca" / "intraday_5m.sqlite",
+        Path.home() / "Documents" / "intraday_5m.sqlite",
         Path.home() / "Documents" / "StockData" / "intraday_5m.sqlite",
     ])
 

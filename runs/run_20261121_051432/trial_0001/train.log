@@ -1,0 +1,7 @@
+Trial 1/5 started: 2026-11-21T05:14:36.581827+00:00
+Symbol: AAPL+RBLX; compute device: CPU
+Tabular Q-learning uses sequential table updates; GPU execution is not used.
+Episodes: 20; seed: 0; epsilon: 1.0 -> 0.05; transaction cost: 5.0 bps; entry bonus: 0.0 bps
+Training: 1156 sessions, 77637 bars (2016-01-04 to 2025-07-02)
+Test: 289 sessions, 21027 bars (2025-07-03 to 2026-11-19)
+Training progress: episode 1/20 (5%), epsilon=1.000, elapsed=0.2 min, ETA=3.5 min

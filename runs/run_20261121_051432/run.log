@@ -1,0 +1,14 @@
+Run directory: C:\Users\Jack Attack\Repos\Linear-Regression-Database\runs\run_20261121_051432
+Trials: 5; episodes per trial: 20
+Compute device: CPU (tabular Q-learning; GPU is not used)
+Symbol: AAPL; base seed: 0
+Trial CSV: C:\Users\Jack Attack\Repos\Linear-Regression-Database\q_learning_trials.csv
+Loading bars from C:\Users\Jack Attack\Documents\intraday_5m.sqlite ...
+Data ready: 98664 bars across 1445 sessions; train=77637 bars, test=21027 bars.
+Trial 1/5 started: 2026-11-21T05:14:36.581827+00:00
+Symbol: AAPL+RBLX; compute device: CPU
+Tabular Q-learning uses sequential table updates; GPU execution is not used.
+Episodes: 20; seed: 0; epsilon: 1.0 -> 0.05; transaction cost: 5.0 bps; entry bonus: 0.0 bps
+Training: 1156 sessions, 77637 bars (2016-01-04 to 2025-07-02)
+Test: 289 sessions, 21027 bars (2025-07-03 to 2026-11-19)
+Training progress: episode 1/20 (5%), epsilon=1.000, elapsed=0.2 min, ETA=3.5 min
