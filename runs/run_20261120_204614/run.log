@@ -1,0 +1,6 @@
+Run directory: C:\Users\Jack Attack\Desktop\llama\llama_alpaca\intraday\tuner_runs\run_20261120_204614
+Trials: 1; episodes per trial: 200
+Compute device: CPU (tabular Q-learning; GPU is not used)
+Symbol: AAPL; base seed: 0
+Trial CSV: C:\Users\Jack Attack\Desktop\llama\llama_alpaca\intraday\tuner_runs\run_20261120_204614\trials.csv
+Loading bars from \\192.168.1.95\CS-CLASSROOM\intraday_5m.sqlite ...

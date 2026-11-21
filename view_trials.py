@@ -24,6 +24,8 @@ def main() -> None:
     parser.add_argument("--latest", action="store_true", help="Show the latest trial")
     parser.add_argument("--search", help="Search trial analysis text")
     parser.add_argument("--top", type=int, default=10, help="Number of rows in rankings")
+    parser.add_argument("--symbol", help="Filter by symbol or symbol-containing pooled model")
+    parser.add_argument("--advice", action="store_true", help="Print tuning advice from the latest run")
     args = parser.parse_args()
 
     rows = load_rows(args.log)
@@ -48,6 +50,13 @@ def main() -> None:
     else:
         selected = rows
 
+    if args.symbol:
+        symbol = args.symbol.upper()
+        rows = [row for row in rows if symbol in row.get("symbol", "").upper().split("+")]
+        if not rows:
+            print(f"No trials found for {symbol}.")
+            return
+
     for row in selected:
         print(f"\n=== Trial {row.get('trial_number', '?')} ===")
         print(f"Symbol: {row.get('symbol', '')}")
@@ -61,6 +70,14 @@ def main() -> None:
         print(f"Trades: {row.get('trades', '')}")
         print(f"Model: {row.get('model_path', '')}")
         print(f"Analysis: {row.get('trial_analysis', '')}")
+
+    if args.advice:
+        latest = rows[-1]
+        advice = Path(latest["run_directory"]) / "tuning_advice.md"
+        if not advice.is_file():
+            raise SystemExit(f"Tuning advice not found: {advice}")
+        print(advice.read_text(encoding="utf-8"))
+        return
 
     if not args.trial and not args.latest and not args.search:
         ranked = sorted(

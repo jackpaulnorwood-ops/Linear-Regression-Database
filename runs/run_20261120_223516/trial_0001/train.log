@@ -1,0 +1,46 @@
+Trial 1/1 started: 2026-11-21T04:35:17.674788+00:00
+Symbol: RBLX; compute device: CPU
+Tabular Q-learning uses sequential table updates; GPU execution is not used.
+Episodes: 20; seed: 0; epsilon: 1.0 -> 0.05; transaction cost: 5.0 bps; entry bonus: 0.0 bps
+Training: 269 sessions, 5298 bars (2024-01-25 to 2025-09-19)
+Test: 68 sessions, 1755 bars (2025-09-29 to 2026-02-06)
+Training progress: episode 1/20 (5%), epsilon=1.000, elapsed=0.0 min, ETA=0.2 min
+Training progress: episode 2/20 (10%), epsilon=0.950, elapsed=0.0 min, ETA=0.2 min
+Training progress: episode 3/20 (15%), epsilon=0.900, elapsed=0.0 min, ETA=0.2 min
+Training progress: episode 4/20 (20%), epsilon=0.850, elapsed=0.0 min, ETA=0.2 min
+Training progress: episode 5/20 (25%), epsilon=0.800, elapsed=0.1 min, ETA=0.2 min
+Training progress: episode 6/20 (30%), epsilon=0.750, elapsed=0.1 min, ETA=0.2 min
+Training progress: episode 7/20 (35%), epsilon=0.700, elapsed=0.1 min, ETA=0.2 min
+Training progress: episode 8/20 (40%), epsilon=0.650, elapsed=0.1 min, ETA=0.1 min
+Training progress: episode 9/20 (45%), epsilon=0.600, elapsed=0.1 min, ETA=0.1 min
+Training progress: episode 10/20 (50%), epsilon=0.550, elapsed=0.1 min, ETA=0.1 min
+Training progress: episode 11/20 (55%), epsilon=0.500, elapsed=0.1 min, ETA=0.1 min
+Training progress: episode 12/20 (60%), epsilon=0.450, elapsed=0.1 min, ETA=0.1 min
+Training progress: episode 13/20 (65%), epsilon=0.400, elapsed=0.2 min, ETA=0.1 min
+Training progress: episode 14/20 (70%), epsilon=0.350, elapsed=0.2 min, ETA=0.1 min
+Training progress: episode 15/20 (75%), epsilon=0.300, elapsed=0.2 min, ETA=0.1 min
+Training progress: episode 16/20 (80%), epsilon=0.250, elapsed=0.2 min, ETA=0.0 min
+Training progress: episode 17/20 (85%), epsilon=0.200, elapsed=0.2 min, ETA=0.0 min
+Training progress: episode 18/20 (90%), epsilon=0.150, elapsed=0.2 min, ETA=0.0 min
+Training progress: episode 19/20 (95%), epsilon=0.100, elapsed=0.2 min, ETA=0.0 min
+Training progress: episode 20/20 (100%), epsilon=0.050, elapsed=0.2 min, ETA=0.0 min
+
+=== Held-out backtest ===
+Net result: LOSS (-17.02%)
+Buy-and-hold return: -10.91%
+Random flat/long return: -33.96%
+Annualized Sharpe: -5.692
+Random baseline Sharpe: -7.691
+Maximum drawdown: 18.93%
+Completed trades: 176
+Entries: 176; exits: 176
+Win rate: 38.1%
+Average trades/session: 2.59
+Time in market: 18.6%
+Analysis: The learned policy beat the seeded random flat/long baseline. The policy completed 176 round-trip trades with 18.6% market exposure. Learned net return -17.023% versus random -33.960% and buy-and-hold -10.906%. This is one seed on one held-out period, not conclusive evidence of future performance.
+Epsilon: No universal optimum: epsilon is the training-time random-action chance, not decision quality. This run linearly decays the configured start to end; compare schedules across multiple seeds using validation data. Backtest prediction is greedy (epsilon=0).
+Sharpe: Annualized mean daily net return divided by daily return standard deviation (252 sessions/year, 0% risk-free rate); not prediction accuracy and not itself a comparison against random.
+Saved model: q_learning_model.json
+Past simulated performance does not establish future profitability.
+Trial summary appended to C:\Users\Jack Attack\Repos\Linear-Regression-Database\q_learning_trials.csv
+Trial analysis written to C:\Users\Jack Attack\Desktop\llama\llama_alpaca\intraday\tuner_runs\run_20261120_223516\trial_0001\analysis.md

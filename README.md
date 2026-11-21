@@ -94,3 +94,35 @@ python view_trials.py --search "random flat/long"
 
 Running `python view_trials.py` prints all analyses followed by a ranking of the
 highest-net-return trials.
+
+## Multi-symbol pooled training
+
+Train one shared tabular model on several symbols:
+
+```bash
+python q_learning.py --symbols AAPL MSFT RBLX --trials 5 --episodes 200
+```
+
+Each symbol contributes separate daily trading sessions, while the same Q-table and feature bins are shared. Use `--symbol AAPL` for a one-symbol experiment.
+
+## Run organization
+
+New runs are stored in `runs/run_YYYYMMDD_HHMMSS/` using UTC timestamps. Every run contains `run.log`, `analyses.md`, `trials.csv`, and `tuning_advice.md`. Each trial contains its model, analysis, log, and `model_archive/` for previous versions.
+
+To migrate older Desktop `tuner_runs` folders, run:
+
+```bash
+python migrate_runs.py
+```
+
+## Tuning recommendations
+
+After a run, review:
+
+```bash
+python view_trials.py --latest
+python view_trials.py --advice
+python view_trials.py --symbol AAPL
+```
+
+`tuning_advice.md` and `tuning_recommendations.csv` contain rule-based hypotheses. They are suggestions for further validation, not guaranteed parameter improvements.

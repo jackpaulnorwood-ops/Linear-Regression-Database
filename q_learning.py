@@ -291,8 +291,12 @@ class RandomPolicy:
 
 
 def _session_rows(data: pd.DataFrame):
-    for _, session in data.groupby("session_date", sort=True):
-        yield session.reset_index(drop=True)
+    if "symbol" in data.columns:
+        for _, session in data.groupby(["symbol", "session_date"], sort=True):
+            yield session.reset_index(drop=True)
+    else:
+        for _, session in data.groupby("session_date", sort=True):
+            yield session.reset_index(drop=True)
 
 
 def training_reward(
@@ -395,15 +399,11 @@ def run_trial(
     bins: dict[str, list[float]],
     args: argparse.Namespace,
     trial_log_path: Path,
-) -> None:
+) -> dict[str, object]:
     trial_directory = run_directory / f"trial_{trial_number:04d}"
     trial_directory.mkdir()
     log_path = trial_directory / "train.log"
-    model_path = (
-        args.model
-        if total_trials == 1
-        else trial_directory / "q_learning_model.json"
-    )
+    model_path = trial_directory / "q_learning_model.json"
     seed = args.seed + trial_number - 1
     started_at = datetime.now(timezone.utc)
     test_dates = sorted(test_data["session_date"].unique())
@@ -463,6 +463,22 @@ def run_trial(
                     RandomPolicy(seed + 1_000_000), test_data, args.cost_bps
                 )
                 agent.save(model_path, args.symbol, args.cost_bps)
+
+                if total_trials == 1:
+                    active_path = args.model if args.model.is_absolute() else Path(__file__).resolve().parent / args.model
+                    active_path.parent.mkdir(parents=True, exist_ok=True)
+                    if active_path.exists():
+                        archive_directory = trial_directory / "model_archive"
+                        archive_directory.mkdir(parents=True, exist_ok=True)
+                        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                        archive_path = archive_directory / f"{active_path.stem}_{timestamp}.json"
+                        suffix = 1
+                        while archive_path.exists():
+                            archive_path = archive_directory / f"{active_path.stem}_{timestamp}_{suffix:02d}.json"
+                            suffix += 1
+                        shutil.copy2(active_path, archive_path)
+                    shutil.copy2(model_path, active_path)
+               
 
                 epsilon_guidance = (
                     "No universal optimum: epsilon is the training-time random-action "
@@ -565,6 +581,7 @@ def run_trial(
                 print(f"Trial summary appended to {trial_log_path}")
                 write_trial_analysis(run_directory, trial_directory, trial)
                 print(f"Trial analysis written to {trial_directory / 'analysis.md'}")
+                return trial
             except Exception as exc:
                 print(f"TRIAL FAILED: {type(exc).__name__}: {exc}", flush=True)
                 raise
@@ -792,9 +809,83 @@ def backtest(
     }
 
 
+def generate_tuning_recommendations(
+    run_directory: Path,
+    trials: list[dict[str, object]],
+    args: argparse.Namespace,
+) -> None:
+    recommendations: list[dict[str, object]] = []
+    if not trials:
+        return
+
+    best = max(trials, key=lambda trial: float(trial["agent_return_pct"]))
+    worst = min(trials, key=lambda trial: float(trial["agent_return_pct"]))
+
+    def add(parameter: str, current: float, suggested: float, reason: str) -> None:
+        recommendations.append({
+            "parameter": parameter,
+            "current_value": current,
+            "suggested_value": suggested,
+            "direction": "increase" if suggested > current else "decrease" if suggested < current else "keep",
+            "reason": reason,
+            "confidence": "low",
+        })
+
+    average_return = sum(float(trial["agent_return_pct"]) for trial in trials) / len(trials)
+    average_trades = sum(int(trial["trades"]) for trial in trials) / len(trials)
+
+    if average_trades == 0:
+        add("entry_bonus_bps", float(args.entry_bonus_bps), max(1.0, float(args.entry_bonus_bps) + 1.0),
+            "No completed trades occurred; a small training-only entry bonus may encourage exploration of long positions.")
+    elif average_trades > 250:
+        add("cost_bps", float(args.cost_bps), float(args.cost_bps) + 5.0,
+            "Average trial trade count was high; a larger cost can discourage churn, but it should be compared on validation data.")
+
+    if float(best["agent_return_pct"]) <= 0:
+        add("epsilon_end", float(args.epsilon_end), max(0.01, float(args.epsilon_end) - 0.02),
+            "The best trial was not profitable; reducing final exploration can stabilize greedy behavior, but this remains an empirical result.")
+
+    if not recommendations:
+        add("episodes", float(args.episodes), float(args.episodes) * 2,
+            "There was no strong rule violation; a larger episode count is a cautious next experiment rather than a proven improvement.")
+
+    csv_path = run_directory / "tuning_recommendations.csv"
+    fields = ["parameter", "current_value", "suggested_value", "direction", "reason", "confidence"]
+    with csv_path.open("w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(recommendations)
+
+    advice_path = run_directory / "tuning_advice.md"
+    advice_path.write_text(
+        "# Tuning recommendations\n\n"
+        "These are rule-based hypotheses from this run, not guaranteed improvements.\n"
+        "Compare them on held-out validation periods and never tune repeatedly against a final test set.\n\n"
+        f"- **Trials compared:** {len(trials)}\n"
+        f"- **Average net return:** {average_return:.3f}%\n"
+        f"- **Best net return:** {float(best['agent_return_pct']):.3f}%\n"
+        f"- **Worst net return:** {float(worst['agent_return_pct']):.3f}%\n"
+        f"- **Average trades:** {average_trades:.1f}\n\n"
+        + "\n".join(
+            f"## {item['parameter']} — {item['direction']}\n"
+            f"- Current: {item['current_value']}\n"
+            f"- Suggested: {item['suggested_value']}\n"
+            f"- Reason: {item['reason']}\n"
+            f"- Confidence: {item['confidence']}\n"
+            for item in recommendations
+        ),
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbol", default="AAPL", help="Stock ticker (default: AAPL)")
+    parser.add_argument(
+        "--symbols",
+        nargs="+",
+        help="Train one pooled model on multiple tickers, for example --symbols AAPL MSFT RBLX",
+    )
     parser.add_argument("--db", type=Path, default=DB_PATH, help="SQLite database path")
     parser.add_argument(
         "--model",
@@ -811,7 +902,7 @@ def main() -> None:
     parser.add_argument(
         "--run-root",
         type=Path,
-        default=Path.home() / "Desktop/llama/llama_alpaca/intraday/tuner_runs",
+        default=Path(__file__).resolve().parent / "runs",
         help="Parent directory for timestamped run and per-trial logs",
     )
     parser.add_argument(
@@ -865,7 +956,18 @@ def main() -> None:
 
             db_uri = f"{args.db.resolve().as_uri()}?mode=ro&immutable=1"
             print(f"Loading bars from {args.db} ...", flush=True)
-            samples = prepare_bars(load_bars(args.symbol, args.db, db_uri))
+            symbols = args.symbols if args.symbols else [args.symbol]
+            symbols = [symbol.upper() for symbol in symbols]
+            args.symbol = "+".join(symbols)
+
+            prepared_frames = []
+            for symbol in symbols:
+                symbol_samples = prepare_bars(load_bars(symbol, args.db, db_uri))
+                symbol_samples = symbol_samples.copy()
+                symbol_samples["symbol"] = symbol
+                prepared_frames.append(symbol_samples)
+
+            samples = pd.concat(prepared_frames, ignore_index=True)
             dates = sorted(samples["session_date"].unique())
             if len(dates) < 2:
                 raise ValueError(
@@ -884,8 +986,9 @@ def main() -> None:
                 f"train={len(training_data)} bars, test={len(test_data)} bars."
             )
 
+            trial_summaries: list[dict[str, object]] = []
             for trial_number in range(1, args.trials + 1):
-                run_trial(
+                trial_result = run_trial(
                     trial_number=trial_number,
                     total_trials=args.trials,
                     run_directory=run_directory,
@@ -895,8 +998,6 @@ def main() -> None:
                     args=args,
                     trial_log_path=trial_log_path,
                 )
+                trial_summaries.append(trial_result)
+            generate_tuning_recommendations(run_directory, trial_summaries, args)
             print(f"All {args.trials} trials completed.")
-
-
-if __name__ == "__main__":
-    main()
