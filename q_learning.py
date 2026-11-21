@@ -3,14 +3,48 @@
 import argparse
 import csv
 from contextlib import redirect_stdout
+import importlib.metadata
 import json
 import math
+import re
 import sqlite3
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
+
+
+def ensure_requirements(requirements_path: Path) -> None:
+    """Install requirement entries that are not already present."""
+    if not requirements_path.is_file():
+        print(f"Dependency file not found: {requirements_path}", flush=True)
+        return
+
+    missing: list[str] = []
+    for raw_line in requirements_path.read_text(encoding="utf-8").splitlines():
+        requirement = raw_line.strip()
+        if not requirement or requirement.startswith("#"):
+            continue
+
+        distribution_name = re.split(r"[<>=!~;\s\[]", requirement, maxsplit=1)[0]
+        if not distribution_name:
+            continue
+        try:
+            importlib.metadata.version(distribution_name)
+        except importlib.metadata.PackageNotFoundError:
+            missing.append(requirement)
+
+    if not missing:
+        print("All packages in requirements.txt are already installed.", flush=True)
+        return
+
+    print("Installing missing packages: " + ", ".join(missing), flush=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", *missing], check=True)
+
+
+ensure_requirements(Path(__file__).resolve().parent / "requirements.txt")
 
 import numpy as np
 import pandas as pd
